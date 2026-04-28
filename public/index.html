@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Calendar</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="logo-icon">📅</span>
+      <h1>School Calendar</h1>
+      <p class="subtitle">Our class's shared planner</p>
+    </div>
+
+    <div id="error-banner" class="banner banner-error" style="display:none"></div>
+    <div id="success-banner" class="banner banner-success" style="display:none"></div>
+
+    <form id="auth-form">
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <input type="email" id="email" placeholder="your@email.com" required autocomplete="email">
+      </div>
+
+      <div id="name-field" class="form-group" style="display:none">
+        <label for="name">Your name <span class="hint">(new here?)</span></label>
+        <input type="text" id="name" placeholder="e.g. Sarah" autocomplete="name">
+      </div>
+
+      <button type="submit" id="submit-btn" class="btn btn-primary btn-full">
+        Send magic link
+      </button>
+    </form>
+
+    <p class="auth-note">No password needed — we'll email you a sign-in link.</p>
+  </div>
+
+  <script>
+    // Show any URL error params
+    const params = new URLSearchParams(location.search);
+    const errMap = {
+      'invalid-link': 'That link is invalid or already used.',
+      'expired-link': 'That link has expired. Please request a new one.',
+      'user-not-found': 'Something went wrong. Please try again.',
+    };
+    if (params.get('error')) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = errMap[params.get('error')] || 'An error occurred.';
+      banner.style.display = 'block';
+    }
+
+    const form = document.getElementById('auth-form');
+    const emailInput = document.getElementById('email');
+    const nameField = document.getElementById('name-field');
+    const nameInput = document.getElementById('name');
+    const submitBtn = document.getElementById('submit-btn');
+    const successBanner = document.getElementById('success-banner');
+    const errorBanner = document.getElementById('error-banner');
+    let needsName = false;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+      errorBanner.style.display = 'none';
+
+      const body = { email: emailInput.value };
+      if (needsName || nameInput.value) body.name = nameInput.value;
+
+      const res = await fetch('/auth/request-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (data.needsName) {
+        needsName = true;
+        nameField.style.display = 'block';
+        nameInput.required = true;
+        nameInput.focus();
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send magic link';
+        return;
+      }
+
+      if (!res.ok) {
+        errorBanner.textContent = data.error || 'Something went wrong.';
+        errorBanner.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send magic link';
+        return;
+      }
+
+      form.style.display = 'none';
+      successBanner.style.display = 'block';
+      if (data.devToken) {
+        successBanner.innerHTML = `<strong>Dev mode:</strong> <a href="/auth/verify/${data.devToken}">Click here to sign in</a> (email not configured)`;
+      } else {
+        successBanner.textContent = data.message || 'Check your email for a sign-in link!';
+      }
+    });
+  </script>
+</body>
+</html>
